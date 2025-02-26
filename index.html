@@ -9,28 +9,28 @@
 
     <section id="hide-image-section">
         <h2>ซ่อนรูปภาพ</h2>
+        <p>อัปโหลดรูปภาพต้นฉบับ (Cover Image) และรูปภาพที่ต้องการซ่อน (Secret Image):</p>
         <input type="file" id="cover-image-upload" accept="image/*">
         <input type="file" id="secret-image-upload" accept="image/*">
         <button id="hide-button">ซ่อนรูปภาพ</button>
         <div id="hidden-image-preview">
             <h3>ตัวอย่างรูปภาพที่ซ่อนแล้ว:</h3>
-            <img id="hidden-image" src="#" alt="รูปภาพที่ซ่อนแล้ว" style="max-width: 300px; max-height: 300px;">
-            <a id="download-hidden-image" href="#" download="hidden_image.png">ดาวน์โหลดรูปภาพที่ซ่อนแล้ว</a>
+            <canvas id="hidden-image-canvas" style="max-width: 300px; max-height: 300px; border: 1px solid #ddd; border-radius: 4px; margin-top: 10px; display: none;"></canvas>
+            <a id="download-hidden-image" href="#" download="hidden_image.png" style="display: none; margin-top: 10px; padding: 8px 12px; background-color: #007bff; color: white; text-decoration: none; border-radius: 4px;">ดาวน์โหลดรูปภาพที่ซ่อนแล้ว</a>
         </div>
     </section>
 
     <section id="reveal-image-section">
         <h2>ถอดรหัสรูปภาพ</h2>
+        <p>อัปโหลดรูปภาพที่ซ่อนข้อมูล (Hidden Image):</p>
         <input type="file" id="hidden-image-upload" accept="image/*">
         <button id="reveal-button">ถอดรหัสรูปภาพ</button>
         <div id="revealed-image-preview">
             <h3>รูปภาพที่ถูกซ่อนไว้:</h3>
-            <img id="revealed-image" src="#" alt="รูปภาพที่ถูกซ่อนไว้" style="max-width: 300px; max-height: 300px;">
+            <canvas id="revealed-image-canvas" style="max-width: 300px; max-height: 300px; border: 1px solid #ddd; border-radius: 4px; margin-top: 10px; display: none;"></canvas>
         </div>
     </section>
 
-    <script>
-        // JavaScript สำหรับการทำงานของเว็บไซต์ (จะใส่ในภายหลัง)
-    </script>
+    <script src="script.js"></script>
 </body>
 </html>
