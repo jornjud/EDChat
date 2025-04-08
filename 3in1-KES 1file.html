@@ -1,0 +1,815 @@
+<!DOCTYPE html>
+<html lang="th" class="h-full">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>3in1 Key-Emoji-Spinner (Dark Mode)</title>
+    <script src="https://cdn.tailwindcss.com?plugins=forms"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore-compat.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-KZ1W13YWND"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-KZ1W13YWND');
+      // gtag('config', 'G-GRGVJ1V7BX'); // Measurement ID จาก Firebase config
+    </script>
+    <style>
+        /* Custom styles for toast and modal (can be refined further) */
+        body {
+            font-family: 'Inter', sans-serif;
+            overscroll-behavior: none; /* Prevent pull-to-refresh */
+        }
+        .toast-notification {
+            position: fixed;
+            bottom: 20px; /* Adjusted for mobile */
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: rgba(50, 50, 50, 0.9); /* Darker toast */
+            color: #fff;
+            padding: 10px 20px;
+            border-radius: 9999px; /* Pill shape */
+            font-size: 0.9rem;
+            z-index: 10000;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+            white-space: nowrap;
+            animation: fadeInOutToast 2.5s ease-in-out forwards;
+            transition: opacity 0.3s ease;
+        }
+        .toast-notification.error {
+             background-color: rgba(239, 68, 68, 0.9); /* Red for errors */
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 9999;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0,0,0,0.7); /* Darker overlay */
+            animation: fadeInModal 0.3s ease-out;
+        }
+        .modal-content {
+            background-color: #2d3748; /* Dark background for modal */
+            color: #e2e8f0; /* Light text */
+            margin: 15% auto; /* Center vertically */
+            padding: 20px;
+            border-radius: 0.75rem; /* Rounded corners */
+            width: 90%;
+            max-width: 500px;
+            position: relative;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+            animation: slideInModal 0.4s cubic-bezier(0.25, 0.8, 0.25, 1);
+        }
+        .modal-content h2 { color: #63b3ed; } /* Light blue heading */
+        #helpContent code { background-color: #4a5568; color: #fed7d7; padding: 2px 5px; border-radius: 4px; }
+        #helpContent div { border-bottom: 1px solid #4a5568; }
+        .close-btn {
+            color: #a0aec0;
+            position: absolute;
+            top: 10px;
+            right: 15px;
+            font-size: 24px; /* Slightly smaller */
+            font-weight: bold;
+            line-height: 1;
+            cursor: pointer;
+            transition: color 0.2s ease;
+        }
+        .close-btn:hover { color: #fff; }
+
+        /* Animations */
+        @keyframes fadeInModal { from {opacity: 0;} to {opacity: 1;} }
+        @keyframes slideInModal { from {transform: translateY(-20px); opacity: 0;} to {transform: translateY(0); opacity: 1;} }
+        @keyframes fadeInOutToast {
+            0% { opacity: 0; bottom: -50px; } /* Start from below */
+            10% { opacity: 1; bottom: 20px; }
+            90% { opacity: 1; bottom: 20px; }
+            100% { opacity: 0; bottom: -50px; } /* Fade out downwards */
+        }
+
+        /* Tailwind Config (Optional: for custom theme colors if needed) */
+        /*
+        tailwind.config = {
+          darkMode: 'class', // or 'media'
+          theme: {
+            extend: {
+              colors: {
+                // Define custom dark theme colors here
+              }
+            }
+          }
+        }
+        */
+    </style>
+</head>
+<body class="bg-gray-900 text-gray-200 h-full flex flex-col items-center justify-center p-4">
+
+    <div id="auth-container" class="w-full max-w-md p-6 md:p-8 bg-gray-800 rounded-xl shadow-lg">
+        <h1 class="text-xl md:text-2xl font-bold text-center text-blue-400 mb-2">🔐 ล็อกอินก่อนใช้ดิวะ ไอ้สัส!🔐</h1>
+        <p class="text-center text-gray-400 text-sm mb-6">ต้องเข้าสู่ระบบก่อน ถึงจะใช้ได้นะมึง!</p>
+
+        <div id="login-form" class="mb-6">
+            <h2 class="text-lg font-semibold text-center mb-4 flex items-center justify-center gap-2"><i class="fas fa-user text-blue-400"></i> Login ไอ้สัส!</h2>
+            <div class="mb-4">
+                <label for="login-username" class="block text-sm font-medium text-gray-300 mb-1">Username หรือ Email:</label>
+                <input type="text" id="login-username" placeholder="กรอก Username หรือ Email..." required class="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-gray-200 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm">
+            </div>
+            <div class="mb-4">
+                <label for="login-password" class="block text-sm font-medium text-gray-300 mb-1">รหัสผ่าน:</label>
+                <input type="password" id="login-password" placeholder="กรอกรหัสผ่าน..." required class="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-gray-200 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm">
+            </div>
+            <button id="login-button" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-md transition duration-200 ease-in-out flex items-center justify-center gap-2 text-sm"><i class="fas fa-check"></i> ล็อกอินดิเหี้ย!</button>
+        </div>
+
+        <hr class="border-gray-600 my-6">
+
+        <div id="register-form">
+            <h2 class="text-lg font-semibold text-center mb-4 flex items-center justify-center gap-2"><i class="fas fa-user-plus text-green-400"></i> สมัครสมาชิกใหม่เหรอวะ?</h2>
+            <div class="mb-4">
+                <label for="register-username" class="block text-sm font-medium text-gray-300 mb-1">Username:</label>
+                <input type="text" id="register-username" placeholder="ตั้ง Username (อังกฤษ/เลข, 3 ตัวขึ้นไป)" required class="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-gray-200 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent text-sm">
+            </div>
+            <div class="mb-4">
+                <label for="register-email" class="block text-sm font-medium text-gray-300 mb-1">Email:</label>
+                <input type="email" id="register-email" placeholder="กรอกอีเมล (ต้องใช้อยู่ดีสัส!)" required class="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-gray-200 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent text-sm">
+            </div>
+            <div class="mb-4">
+                <label for="register-password" class="block text-sm font-medium text-gray-300 mb-1">รหัสผ่าน:</label>
+                <input type="password" id="register-password" placeholder="ตั้งรหัสผ่าน (6 ตัวอักษรขึ้นไป)" required class="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-gray-200 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent text-sm">
+            </div>
+            <button id="register-button" class="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded-md transition duration-200 ease-in-out flex items-center justify-center gap-2 text-sm"><i class="fas fa-plus-circle"></i> สมัครโว้ย!</button>
+        </div>
+
+        <p id="auth-error" class="text-red-400 text-center mt-4 font-semibold text-sm min-h-[1.2em]"></p>
+    </div>
+
+    <div id="app-container" class="w-full h-full max-w-3xl bg-gray-800 rounded-xl shadow-lg p-4 md:p-6 flex flex-col" style="display: none;">
+
+        <div class="flex justify-between items-center mb-4 flex-wrap gap-2">
+            <h1 class="text-lg md:text-xl font-bold text-center text-blue-400 flex-grow whitespace-nowrap">🔐 3in1 Key-Emoji-Spinner 🔐</h1>
+            <div class="flex items-center gap-2 flex-shrink-0">
+                <span id="user-display" class="text-xs md:text-sm text-gray-400"></span>
+                <button id="logout-button" class="p-2 rounded-full bg-red-600 hover:bg-red-700 text-white transition duration-200 text-xs" title="ออกจากระบบ"><i class="fas fa-sign-out-alt"></i></button>
+                <button id="helpBtn" class="p-2 rounded-full bg-blue-600 hover:bg-blue-700 text-white transition duration-200 text-xs" title="วิธีใช้งาน"><i class="fas fa-question-circle"></i></button>
+            </div>
+        </div>
+
+        <div class="mode-instruction text-center text-sm text-gray-400 mb-4 flex items-center justify-center gap-2">
+            <i class="fas fa-hand-point-down text-blue-400"></i> กรุณาเลือกโหมดการใช้งานก่อนเริ่มต้น
+        </div>
+
+        <div class="mode-buttons grid grid-cols-3 gap-2 md:gap-3 mb-4">
+             <button id="xorModeBtn" class="mode-btn bg-gray-700 hover:bg-gray-600 text-gray-300 font-medium py-2 px-3 rounded-lg transition duration-200 text-xs md:text-sm flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 text-center">
+                <i class="fas fa-key"></i> <span class="whitespace-nowrap">Key Translator</span>
+            </button>
+             <button id="emojiModeBtn" class="mode-btn bg-gray-700 hover:bg-gray-600 text-gray-300 font-medium py-2 px-3 rounded-lg transition duration-200 text-xs md:text-sm flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 text-center">
+                <i class="fas fa-smile"></i> <span class="whitespace-nowrap">Emoji Code</span>
+            </button>
+             <button id="wordSpinnerModeBtn" class="mode-btn bg-gray-700 hover:bg-gray-600 text-gray-300 font-medium py-2 px-3 rounded-lg transition duration-200 text-xs md:text-sm flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 text-center">
+                <i class="fas fa-sync-alt"></i> <span class="whitespace-nowrap">Word Spinner</span>
+            </button>
+        </div>
+        <style> /* Style for active button */
+            .mode-btn.active { background-color: #2563eb; color: white; } /* Blue-600 */
+        </style>
+
+        <div id="keywordSection" class="keyword-section mb-4" style="display: none;">
+            <label for="keywordInput" class="flex items-center gap-2 text-sm font-medium text-gray-300 whitespace-nowrap mr-2"><i class="fas fa-search"></i> Keyword:</label>
+            <input type="text" id="keywordInput" placeholder="ใส่คีย์เวิร์ด... หรือเว้นว่างไว้" class="flex-grow px-3 py-1.5 bg-gray-700 border border-gray-600 rounded-md text-gray-200 placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-transparent text-sm" />
+        </div>
+
+        <div class="io-section flex flex-col gap-3 flex-grow min-h-0">
+            <textarea id="inputText" placeholder="📝 พิมพ์ข้อความที่นี่..." class="w-full flex-1 resize-none p-3 bg-gray-700 border border-gray-600 rounded-md text-gray-200 placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-transparent text-sm min-h-[80px]"></textarea>
+            <textarea id="outputText" placeholder="📤 ผลลัพธ์จะแสดงที่นี่..." readonly class="w-full flex-1 resize-none p-3 bg-gray-600 border border-gray-500 rounded-md text-gray-300 placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-transparent text-sm min-h-[80px]"></textarea>
+        </div>
+
+        <div class="action-buttons grid grid-cols-2 gap-2 md:gap-3 mt-4">
+            <button id="copyButton" class="bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded-lg transition duration-200 ease-in-out flex items-center justify-center gap-2 text-sm"><i class="fas fa-copy"></i> คัดลอก</button>
+            <button id="clearButton" class="bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-4 rounded-lg transition duration-200 ease-in-out flex items-center justify-center gap-2 text-sm"><i class="fas fa-trash"></i> ล้าง</button>
+        </div>
+
+        <div class="video-link text-center text-xs md:text-sm mt-4 text-gray-400">
+            📹 <a href="https://www.youtube.com/watch?v=VIDEO_ID" target="_blank" class="text-blue-400 hover:text-blue-300 hover:underline">เร็วๆนี้...ดูวิดีโอการใช้งานบน YouTube</a>
+        </div>
+    </div>
+
+    <div id="helpModal" class="modal">
+        <div class="modal-content">
+            <span class="close-btn">×</span>
+            <h2 class="text-lg md:text-xl font-semibold text-center mb-4 flex items-center justify-center gap-2"><i class="fas fa-info-circle"></i> วิธีใช้งานแต่ละโหมด 🤓</h2>
+            <div id="helpContent" class="text-sm space-y-4">
+                </div>
+        </div>
+    </div>
+
+    <script>
+        // ======== Firebase Configuration ========
+        const firebaseConfig = {
+            apiKey: "AIzaSyB3ZXwlQlNPKEaryal0YnbarwQoz1DjhEE", // เช็คให้ดีว่าเป็น Key ของมึงจริงๆ
+            authDomain: "in1-e0d50.firebaseapp.com",
+            projectId: "in1-e0d50",
+            storageBucket: "in1-e0d50.appspot.com", // เช็คอันนี้ด้วย
+            messagingSenderId: "785769870882",
+            appId: "1:785769870882:web:42df8ee3b40eced196bc7b",
+            measurementId: "G-GRGVJ1V7BX"
+        };
+
+        // ======== Initialize Firebase ========
+        firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+        const db = firebase.firestore();
+        console.log("Firebase & Firestore Initialized เรียบร้อยโว้ย!");
+
+        // ======== Element References (Auth + App) ========
+        const authContainer = document.getElementById('auth-container');
+        const appContainer = document.getElementById('app-container');
+        const loginUsernameInput = document.getElementById('login-username');
+        const loginPasswordInput = document.getElementById('login-password');
+        const loginButton = document.getElementById('login-button');
+        const registerUsernameInput = document.getElementById('register-username');
+        const registerEmailInput = document.getElementById('register-email');
+        const registerPasswordInput = document.getElementById('register-password');
+        const registerButton = document.getElementById('register-button');
+        const logoutButton = document.getElementById('logout-button');
+        const authErrorDisplay = document.getElementById('auth-error');
+        const userDisplay = document.getElementById('user-display');
+        const xorModeBtn = document.getElementById('xorModeBtn');
+        const wordSpinnerModeBtn = document.getElementById('wordSpinnerModeBtn');
+        const emojiModeBtn = document.getElementById('emojiModeBtn');
+        const keywordSection = document.getElementById('keywordSection');
+        const keywordInput = document.getElementById('keywordInput');
+        const inputText = document.getElementById('inputText');
+        const outputText = document.getElementById('outputText');
+        const copyButton = document.getElementById('copyButton');
+        const clearButton = document.getElementById('clearButton');
+        const helpBtn = document.getElementById('helpBtn');
+        const helpModal = document.getElementById('helpModal');
+        const closeBtn = helpModal.querySelector('.close-btn');
+        const helpContent = document.getElementById('helpContent');
+
+        let currentMode = null;
+        let toastTimeout = null;
+
+        // ======== ฟังก์ชันแสดง Toast ========
+        function showToast(message, duration = 2500, isError = false) {
+            const existingToast = document.querySelector('.toast-notification');
+            if (existingToast) { clearTimeout(toastTimeout); existingToast.remove(); }
+            const toast = document.createElement('div');
+            toast.textContent = message;
+            toast.className = 'toast-notification';
+            if (isError) { toast.classList.add('error'); } // ใช้ class 'error'
+            document.body.appendChild(toast);
+
+            // Force reflow to enable animation
+            toast.offsetHeight;
+
+            toast.style.opacity = '1'; // Make it visible for animation
+
+            toastTimeout = setTimeout(() => {
+                toast.style.opacity = '0';
+                setTimeout(() => {
+                    if (toast.parentNode) {
+                         toast.parentNode.removeChild(toast);
+                    }
+                }, 300); // Wait for fade out transition
+            }, duration - 300);
+        }
+
+
+        // ======== ฟังก์ชันแสดง Error ของ Auth ========
+        function showAuthError(message) {
+            let displayMessage = message;
+            // แปลง Error codes เป็นภาษาไทยที่เข้าใจง่าย
+            if (message.includes('auth/invalid-email')) { displayMessage = 'รูปแบบอีเมลไม่ถูกต้อง'; }
+            else if (message.includes('auth/user-not-found') || message.includes('auth/invalid-credential')) { displayMessage = 'Username (หรือ Email) หรือรหัสผ่านไม่ถูกต้อง'; }
+            else if (message.includes('auth/wrong-password')) { displayMessage = 'รหัสผ่านไม่ถูกต้อง'; }
+            else if (message.includes('auth/email-already-in-use')) { displayMessage = 'อีเมลนี้ถูกใช้งานแล้ว'; }
+            else if (message.includes('auth/weak-password')) { displayMessage = 'รหัสผ่านสั้นหรือคาดเดาง่ายเกินไป (ต้องมีอย่างน้อย 6 ตัวอักษร)'; }
+            else if (message.includes('auth/missing-password')) { displayMessage = 'กรุณากรอกรหัสผ่าน'; }
+            else if (message.includes('auth/missing-email')) { displayMessage = 'กรุณากรอกอีเมล'; }
+            else if (message.includes('Username check failed') || message.includes('Firestore write failed')) { displayMessage = 'เกิดปัญหาเกี่ยวกับฐานข้อมูล Username ลองใหม่อีกครั้ง'; }
+            else if (message.includes('Username already exists')) { displayMessage = `Username นี้มีคนใช้แล้ว!`; }
+            else if (message.includes('Username not found')) { displayMessage = `ไม่พบ Username นี้ในระบบ!`; }
+            else if (message.includes('Invalid Username format')) { displayMessage = `Username ใช้ได้เฉพาะตัวอักษรภาษาอังกฤษ (a-z), ตัวเลข (0-9) และขีดล่าง (_) เท่านั้น`; }
+            else if (message.includes('Username too short') || message.includes('Username too long')) { displayMessage = `Username ต้องมีความยาว 3-30 ตัวอักษร`; }
+
+            if(authErrorDisplay) authErrorDisplay.textContent = `🚫 ${displayMessage}`;
+            showToast(`🚫 ${displayMessage}`, 4000, true); // แสดงเป็น Toast ด้วย
+        }
+
+        // ======== Event Listener ของปุ่ม Register ========
+        if (registerButton) {
+            registerButton.addEventListener('click', async () => {
+                if (!registerUsernameInput || !registerEmailInput || !registerPasswordInput) {
+                    console.error("Register form inputs not found!");
+                    showAuthError("เกิดข้อผิดพลาดกับฟอร์มลงทะเบียน");
+                    return;
+                }
+                const username = registerUsernameInput.value.trim().toLowerCase();
+                const email = registerEmailInput.value.trim();
+                const password = registerPasswordInput.value;
+                if(authErrorDisplay) authErrorDisplay.textContent = '';
+
+                // Input Validation (เหมือนเดิม)
+                if (!username || !email || !password) { showAuthError("กรุณากรอก Username, Email, และ Password ให้ครบถ้วน"); return; }
+                const usernameRegex = /^[a-z0-9_]+$/;
+                if (!usernameRegex.test(username)) { showAuthError("Invalid Username format"); return; }
+                if (username.length < 3 || username.length > 30) { showAuthError("Username too short or Username too long"); return; }
+                if (password.length < 6) { showAuthError("auth/weak-password"); return; }
+
+                try {
+                    // 1. เช็ค Username ซ้ำใน Firestore
+                    console.log(`Checking username: ${username}`);
+                    const usernameRef = db.collection('usernames').doc(username);
+                    const usernameDoc = await usernameRef.get();
+                    if (usernameDoc.exists) {
+                        console.log(`Username ${username} already exists.`);
+                        showAuthError(`Username already exists`); return;
+                    }
+                    console.log(`Username ${username} is available.`);
+
+                    // 2. สร้าง User ใน Firebase Auth
+                    console.log(`Creating user in Auth for email: ${email}`);
+                    const userCredential = await auth.createUserWithEmailAndPassword(email, password);
+                    const user = userCredential.user;
+                    console.log('Auth user created successfully! UID:', user.uid);
+
+                    // 3. บันทึกข้อมูลลง Firestore (ใช้ Batch Write)
+                    console.log(`Writing user data to Firestore for UID: ${user.uid} and Username: ${username}`);
+                    const batch = db.batch();
+                    const userDocRef = db.collection('users').doc(user.uid);
+                    batch.set(userDocRef, {
+                        username: username,
+                        email: user.email,
+                        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                    });
+                    batch.set(usernameRef, { // usernameRef จากขั้นตอนที่ 1
+                        userId: user.uid,
+                        email: user.email // เก็บ email ไว้ด้วยเผื่อ Login ด้วย Username
+                    });
+
+                    // 4. Commit Batch Write
+                    await batch.commit();
+                    console.log('Firestore write successful!');
+
+                    showToast(`✅ ลงทะเบียนสำเร็จ! ยินดีต้อนรับ ${username}!`);
+                    registerUsernameInput.value = '';
+                    registerEmailInput.value = '';
+                    registerPasswordInput.value = '';
+                    // ไม่ต้องสลับหน้าจอเอง onAuthStateChanged จะจัดการให้
+
+                } catch (error) {
+                    console.error('Registration failed:', error);
+                    if (error.code && error.code.startsWith('auth/')) {
+                        showAuthError(error.message);
+                    } else {
+                        showAuthError('เกิดข้อผิดพลาดบางอย่างระหว่างการลงทะเบียน โปรดลองอีกครั้ง');
+                        // Consider adding cleanup logic if auth user was created but Firestore failed
+                        if (auth.currentUser && auth.currentUser.email === email) {
+                             console.warn("Auth user might have been created but Firestore write failed. Attempting to delete auth user.");
+                             // Optionally try to delete the orphaned auth user
+                             // await auth.currentUser.delete().catch(delErr => console.error("Failed to delete orphaned auth user", delErr));
+                        }
+                    }
+                }
+            });
+        } else {
+            console.error("Register button not found!");
+        }
+
+
+        // ======== Event Listener ของปุ่ม Login ========
+        if (loginButton) {
+            loginButton.addEventListener('click', async () => {
+                if (!loginUsernameInput || !loginPasswordInput) {
+                    console.error("Login form inputs not found!");
+                    showAuthError("เกิดข้อผิดพลาดกับฟอร์มล็อกอิน");
+                    return;
+                }
+                const usernameOrEmail = loginUsernameInput.value.trim();
+                const password = loginPasswordInput.value;
+                if(authErrorDisplay) authErrorDisplay.textContent = '';
+
+                if (!usernameOrEmail || !password) { showAuthError("กรุณากรอก Username (หรือ Email) และรหัสผ่าน"); return; }
+
+                try {
+                    let emailToLogin = usernameOrEmail;
+
+                    // ตรวจสอบว่าเป็น Username หรือ Email
+                    if (!usernameOrEmail.includes('@')) {
+                        const usernameLower = usernameOrEmail.toLowerCase();
+                        console.log(`Input looks like username: ${usernameLower}. Querying Firestore...`);
+                        const usernameRef = db.collection('usernames').doc(usernameLower);
+                        const usernameDoc = await usernameRef.get();
+
+                        if (usernameDoc.exists) {
+                            emailToLogin = usernameDoc.data().email;
+                            if (!emailToLogin) {
+                                console.error(`Username ${usernameLower} found in Firestore but missing email field!`);
+                                showAuthError(`เกิดข้อผิดพลาด: ไม่พบอีเมลสำหรับ Username นี้`); return;
+                            }
+                            console.log(`Username found! Corresponding email: ${emailToLogin}`);
+                        } else {
+                            console.log(`Username ${usernameLower} not found in Firestore.`);
+                            // Try logging in with the input as email directly as a fallback,
+                            // because the original code didn't explicitly prevent this.
+                            // showAuthError(`Username not found`); return;
+                            console.warn(`Username ${usernameLower} not found, attempting login with input as email.`);
+                            emailToLogin = usernameOrEmail; // Keep original input if it wasn't found as username
+                        }
+                    } else {
+                        console.log(`Input looks like email: ${emailToLogin}`);
+                    }
+
+                    // ใช้ Email ที่ได้มา Login Auth
+                    console.log(`Attempting Firebase Auth sign-in with email: ${emailToLogin}`);
+                    const userCredential = await auth.signInWithEmailAndPassword(emailToLogin, password);
+                    console.log('Login successful! User:', userCredential.user);
+
+                    loginUsernameInput.value = '';
+                    loginPasswordInput.value = '';
+                    // ไม่ต้องสลับหน้าจอเอง onAuthStateChanged จะจัดการให้
+
+                } catch (error) {
+                    console.error('Login failed:', error);
+                     // Check specific error codes for better messages
+                    if (error.code === 'auth/user-not-found' ||
+                        error.code === 'auth/wrong-password' ||
+                        error.code === 'auth/invalid-credential' || // Generic credential error
+                        error.code === 'auth/invalid-email') {
+                        showAuthError('Username (หรือ Email) หรือรหัสผ่านไม่ถูกต้อง โปรดตรวจสอบ');
+                    } else if (error.code === 'auth/too-many-requests') {
+                         showAuthError('ตรวจพบกิจกรรมที่น่าสงสัย ลองอีกครั้งภายหลัง');
+                    }
+                    else {
+                        showAuthError('เกิดข้อผิดพลาดในการล็อกอิน: ' + error.message);
+                    }
+                }
+            });
+        } else {
+            console.error("Login button not found!");
+        }
+
+
+        // ======== Event Listener ของปุ่ม Logout ========
+        if (logoutButton) {
+            logoutButton.addEventListener('click', () => {
+                auth.signOut().then(() => {
+                    console.log('ออกจากระบบแล้ว!');
+                    showToast('👋 ออกจากระบบเรียบร้อยแล้ว');
+                    // onAuthStateChanged จะจัดการการซ่อน/แสดง container
+                }).catch((error) => {
+                    console.error('Logout Error:', error);
+                    showAuthError('เกิดข้อผิดพลาดในการออกจากระบบ: ' + error.message);
+                });
+            });
+        } else {
+            console.error("Logout button not found!");
+        }
+
+
+        // ======== onAuthStateChanged (จัดการการแสดงผล Auth/App) ========
+        auth.onAuthStateChanged(async (user) => {
+            if (user) {
+                // --- ผู้ใช้ล็อกอินอยู่ ---
+                console.log('ผู้ใช้ล็อกอินอยู่:', user.email, 'UID:', user.uid);
+                let displayNameToShow = user.email; // Default to email
+
+                // พยายามดึง Username จาก Firestore
+                try {
+                    console.log(`กำลังดึงข้อมูลผู้ใช้จาก Firestore สำหรับ UID: ${user.uid}`);
+                    const userDocRef = db.collection('users').doc(user.uid);
+                    const userDoc = await userDocRef.get();
+                    if (userDoc.exists) {
+                        const userData = userDoc.data();
+                        console.log('พบข้อมูลผู้ใช้ใน Firestore:', userData);
+                        if (userData.username) {
+                            displayNameToShow = userData.username;
+                            console.log(`กำลังแสดง username: ${displayNameToShow}`);
+                        } else {
+                            console.log('ไม่พบฟิลด์ username ในเอกสาร Firestore, ใช้ email แทน');
+                        }
+                    } else {
+                        console.warn(`ไม่พบเอกสารผู้ใช้สำหรับ UID ${user.uid} ใน Firestore! อาจเป็น user เก่า หรือเกิดข้อผิดพลาดตอนสมัคร`);
+                        // Consider creating the user document here if it's missing?
+                    }
+                } catch (error) {
+                    console.error("เกิดข้อผิดพลาดในการดึงข้อมูลผู้ใช้จาก Firestore:", error);
+                    // Show email even if Firestore fetch fails
+                }
+
+                // อัปเดต UI สำหรับ App
+                if(userDisplay) userDisplay.textContent = `| ${displayNameToShow}`;
+                if(authContainer) authContainer.style.display = 'none'; // ซ่อนฟอร์ม Auth
+                if(appContainer) appContainer.style.display = 'flex'; // แสดง App หลัก (ใช้ flex)
+                if(authErrorDisplay) authErrorDisplay.textContent = ''; // ล้างข้อความ error เก่า
+
+            } else {
+                // --- ผู้ใช้ไม่ได้ล็อกอิน ---
+                console.log('ผู้ใช้ออกจากระบบแล้ว');
+                if(authContainer) authContainer.style.display = 'block'; // แสดงฟอร์ม Auth
+                if(appContainer) appContainer.style.display = 'none'; // ซ่อน App หลัก
+                if(userDisplay) userDisplay.textContent = ''; // ล้างชื่อผู้ใช้
+
+                // ล้างค่าใน Spinner Inputs
+                if (inputText) inputText.value = '';
+                if (outputText) outputText.value = '';
+                if (keywordInput) keywordInput.value = '';
+                if (currentMode) {
+                    document.querySelectorAll('.mode-btn.active').forEach(btn => btn.classList.remove('active'));
+                    currentMode = null;
+                    if (typeof updateUI === 'function') updateUI(); // ซ่อน/แสดง keyword input
+                }
+                 // ล้างค่าใน Auth Forms
+                if(loginUsernameInput) loginUsernameInput.value = '';
+                if(loginPasswordInput) loginPasswordInput.value = '';
+                if(registerUsernameInput) registerUsernameInput.value = '';
+                if(registerEmailInput) registerEmailInput.value = '';
+                if(registerPasswordInput) registerPasswordInput.value = '';
+                if(authErrorDisplay) authErrorDisplay.textContent = ''; // ล้าง error ด้วย
+            }
+        });
+
+
+        // ######################################################################
+        // ########   โค้ดส่วน Spinner (Core Logic - ไม่แก้ไข)             ########
+        // ######################################################################
+
+        const ALLOWED_CHARS = 'กขคฆงจฉชซฌญฎฏฐฑฒณดตถทธนบปผฝพฟภมยรลวศษสหฬอฮฤๆะัาิีึืุูเแโใไๅำ่้๊๋abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()_+-=[]{}|;:,./<>?๐αβγδεζηθικλμνξοπρστυφχψωΑΒΓΔΕΖΗΘΙΚΛΜΝΞΟΠΡΣΤΥΦΧΨΩ';
+        const DEFAULT_KEYWORD = 'jornjud';
+        const DEFAULT_PREFIX = '~';
+        const SEED_LENGTH = 4;
+        function generateShortSeed() { return Math.random().toString(36).slice(-SEED_LENGTH).padStart(SEED_LENGTH, '0'); }
+        function createPRNG(seed) { const seedHash = [...seed].reduce((hash, ch) => (hash * 31 + ch.charCodeAt(0)) & 0x7fffffff, 0); let state = seedHash; return () => { state = (state * 1103515245 + 12345) & 0x7fffffff; return state / 0x80000000; }; }
+        const pigpenEmojis = ['😀','😁','😂','🤣','😃','😄','😅','😆','😉','😊', '😋','😎','😍','😘','😗','😙','😚','🙂','🤗','🤩','🤔','🤨','😐','😑','😶','🙄','😏','😣','😥','😮', '🤐','😯','😪','😫','😴','😌','😛','😜','😝','🤤','😒','😓','😔','😕','🙃','🤑','😲','☹️','🙁','😖', '😞','😟','😤','😢','😭','😦','😧','😨','😩','🤯','😬','😰','😱','🥵','🥶','😳','🤪','😵','😡','😠', '🤬','😷','🤒','🤕','🤢','🤮','🤧','😇','🥰','🤠','🤡','🥳','🥴','🥺','🤥','🤫','🤭','🧐','🤓','😈', '👿','👹','👺','💀','👻','👽','🤖','💩','😺','😸','😹','😻','😼','😽','🙀','😿','😾','🐶','🐱','🐭', '🐹','🐰','🦊','🐻','🐼','🐨','🐯','🦁','🐮','🐷','🐽','🐸','🐵','🙈','🙉','🙊','🐒','🐔','🐧','🐦', '🐤','🐣','🐥','🦆','🦅','🦉','🦇','🐺','🐗','🐴','🦄','🐝','🐛','🦋','🐌','🐞','🐜','🦗','🕷','🕸', '🦂','🐢','🐍','🦎','🦖','🦕','🐙','🦑','🦐','🦀','🐡','🐠','🐟','🐬','🐳','🐋','🦈','🐊','🐅','🐆', '🦓','🦍','🐘','🦏','🐪','🐫','🦒','🦘','🐃','🐂','🐄','🐎','🐖','🐏','🐑','🐐','🐓','🦃','🕊','🐇', '🐁','🐀','🐿','🦔','🐾','🐉','🐲','🌵','🎄','🌲','🌳','🌴','🌱','🌿','☘️','🍀','🎍','🎋','🍃','🍂', '🍁','🍄','🌾','💐','🌷','🌹','🥀','🌺','🌸','🌼','🌻','🌞','🌝','🌛','🌚','🌜','🌙','⭐','🌟','💫', '✨','⚡','☄️','💥','🔥','🌪','🌈','☀️','🌤','⛅','🌥','☁️','🌦','🌧','⛈','🌩','🌨','❄️','☃️','⛄', '🌬','💨','💧','💦','☔','☂️','🌊','🌫','🍏','🍎','🍐','🍊','🍋','🍌','🍉','🍇','🍓','🍈','🍒','🍑', '🥭','🍍','🥥','🥝','🍅','🍆','🥑','🥦','🥬','🥒','🌶','🌽','🥕','🥔','🍠','🥐','🍞','🥖','🥨','🧀', '🥚','🍳','🥞','🥓','🥩','🍗','🍖','🌭','🍔','🍟','🍕','🥪','🥙','🌮','🌯','🥗','🥘','🍝','🍜','🍲', '🍥','𥠠','🍣','🍱','🍛','🍚','🍙','🍘','🍢','🍡','🍧','🍨','🍦','🥧','🧁','🍰','🎂','🍮','🍭','🍬', '🍫','🍿','🍩','🍪','🌰','🥜','🍯','🥛','🍼','☕','🍵','🥤','🍶','🍺','🍻','🥂','🍷','🥃','🍸','🍹', '🍾','🥄','🍴','🍽','🥣','🥡','🥢','🚗','🚕','🚙','🚌','🚎','🏎','🚓','🚑','🚒','🚐','🚚','🚛','🚜', '🛴','🚲','🛵','🏍','🚨','🚔','🚍','🚘','🚖','🚡','🚠','🚟','🚃','🚋','🚞','🚝','🚄','🚅','🚈','🚂', '🚆','🚇','🚊','🚉','✈️','🛫','🛬','🛩','💺','🛰','🚀','🛸','🚁','🛶','⛵','🚤','🛥','🛳','⛴','🚢', '⚓','🚧','⛽','🚏','🚦','🚥','🗺','🗿','🗽','⛲','🗼','🏰','🏯','🎡','🎢','🎠','⛱','🏖','🏝','🌋', '⛰','🏔','🗻','🏕','⛺','🏠','🏡','🏘','🏚','🏗','🏭','🏢','🏬','🏣','🏤','🏥','🏦','🏨','🏪','🏫', '🏩','💒','🏛','⛪','🕌','🕍','🕋','⛩','🛤','🛣','🗾','🎑','🏞','🌅','🌄','🌠','🎇','🎆','🌇','🌆', '🏙','🌃','🌌','🌉','🌁'];
+        const charToEmoji = new Map(); const emojiToChar = new Map();
+        for (let i = 0; i < ALLOWED_CHARS.length && i < pigpenEmojis.length; i++) { charToEmoji.set(ALLOWED_CHARS[i], pigpenEmojis[i]); emojiToChar.set(pigpenEmojis[i], ALLOWED_CHARS[i]); }
+        function encodeEmoji(text) { return [...text].map(ch => charToEmoji.get(ch) || ch).join(''); }
+        function decodeEmoji(text) { const emojiArray = Array.from(text); return emojiArray.map(emoji => emojiToChar.get(emoji) || emoji).join(''); }
+        function isAllEmoji(str) { const emojiArray = Array.from(str); return emojiArray.every(emoji => emojiToChar.has(emoji) || /\s/.test(emoji)); } // Allow whitespace
+        function encodeWordspinner(text) { const chars = [...text]; const seed = generateShortSeed(); const prng = createPRNG(seed); const positions = chars.map((_, i) => i).sort(() => prng() - 0.5); const shuffledText = positions.map(pos => chars[pos]).join(''); return `${DEFAULT_PREFIX}${seed}${shuffledText}`; }
+        function decodeWordspinner(text) { if (!text.startsWith(DEFAULT_PREFIX) || text.length < (DEFAULT_PREFIX.length + SEED_LENGTH)) return text; const seed = text.slice(DEFAULT_PREFIX.length, DEFAULT_PREFIX.length + SEED_LENGTH); const cipherText = text.slice(DEFAULT_PREFIX.length + SEED_LENGTH); if (cipherText.length === 0) return ''; const prng = createPRNG(seed); const positions = [...Array(cipherText.length).keys()].sort(() => prng() - 0.5); const reversePositions = new Array(cipherText.length); positions.forEach((shuffledIndex, originalIndex) => { reversePositions[shuffledIndex] = originalIndex; }); return reversePositions.map(pos => cipherText[pos]).join(''); }
+        function isLikelyWordspinner(text) { return text.startsWith(DEFAULT_PREFIX) && text.length >= (DEFAULT_PREFIX.length + SEED_LENGTH); }
+        function encodeThaiEng(text, keyword) { const seed = generateShortSeed(); const prng = createPRNG(seed + keyword); return seed + [...text].map(ch => { const idx = ALLOWED_CHARS.indexOf(ch); if (idx === -1) return ch; const randOffset = Math.floor(prng() * ALLOWED_CHARS.length); return ALLOWED_CHARS[(idx + randOffset) % ALLOWED_CHARS.length]; }).join(''); }
+        function decodeThaiEng(encText, keyword) { if (!encText || encText.length < SEED_LENGTH) return encText; const seed = encText.slice(0, SEED_LENGTH); const cipherText = encText.slice(SEED_LENGTH); if (cipherText.length === 0) return ''; const prng = createPRNG(seed + keyword); return [...cipherText].map(ch => { const idx = ALLOWED_CHARS.indexOf(ch); if (idx === -1) return ch; const randOffset = Math.floor(prng() * ALLOWED_CHARS.length); return ALLOWED_CHARS[(idx - randOffset % ALLOWED_CHARS.length + ALLOWED_CHARS.length) % ALLOWED_CHARS.length]; }).join(''); }
+        function isLikelyEncoded(text) { return /^[a-z0-9]{4}/.test(text) && text.length > SEED_LENGTH; } // Basic check for seed
+
+        // ======== UI Update Function ========
+        function updateUI() {
+            if(keywordSection) {
+                 keywordSection.style.display = (currentMode === 'xor') ? 'flex' : 'none';
+            }
+        }
+
+        // ======== Process Input Based on Mode ========
+        function processCurrentMode() {
+            if (!auth.currentUser) {
+                console.warn("User not logged in, cannot process.");
+                // showToast("⚠️ กรุณาล็อกอินก่อนใช้งานฟังก์ชันนี้", 3000, true); // Maybe too intrusive on every input
+                return;
+            }
+            const text = inputText.value;
+            let result = '';
+            let action = '';
+
+            if (text.trim() === '') {
+                if(outputText) outputText.value = '';
+                return; // Clear output if input is empty
+            }
+
+            if (!currentMode) {
+                if(outputText) outputText.value = '⚠️ กรุณาเลือกโหมดก่อน';
+                showToast('⚠️ กรุณาเลือกโหมดก่อน', 3000);
+                return;
+            }
+
+            try {
+                if (currentMode === 'xor') {
+                    let key = keywordInput.value.trim() || DEFAULT_KEYWORD;
+                    if (isLikelyEncoded(text)) {
+                        action = '🔑 กำลังถอดรหัส (Key)...';
+                        // showToast(action); // Can be annoying on every keystroke
+                        result = decodeThaiEng(text, key);
+                    } else {
+                        action = '🔒 กำลังเข้ารหัส (Key)...';
+                        // showToast(action);
+                        result = encodeThaiEng(text.trim(), key);
+                    }
+                } else if (currentMode === 'wordspinner') {
+                    if (isLikelyWordspinner(text)) {
+                        action = '🔄 กำลังถอดรหัส (Spinner)...';
+                        // showToast(action);
+                        result = decodeWordspinner(text);
+                    } else {
+                        action = '✨ กำลังเข้ารหัส (Spinner)...';
+                        // showToast(action);
+                        result = encodeWordspinner(text.trim());
+                    }
+                } else if (currentMode === 'emoji') {
+                    if (isAllEmoji(text)) {
+                        action = '😃 กำลังถอดรหัส (Emoji)...';
+                        // showToast(action);
+                        result = decodeEmoji(text);
+                    } else {
+                        action = '🤪 กำลังเข้ารหัส (Emoji)...';
+                        // showToast(action);
+                        result = encodeEmoji(text.trim());
+                    }
+                }
+                if(outputText) outputText.value = result;
+            } catch (error) {
+                console.error("Processing Error:", error);
+                showToast(`❌ เกิดข้อผิดพลาด: ${error.message}`, 4000, true);
+                if(outputText) outputText.value = 'เกิดข้อผิดพลาด!';
+            }
+        }
+
+        // ======== Send Log Function (Optional) ========
+        function sendLog(input, output, mode, keyword) {
+            const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbxkIJMiPz5HbBSDBKw-nmMvs3LPUa6RsR8AHtUoMMZcVpvHZbRhgGKYO62AoESBs8dufw/exec'; // <-- ตรวจ URL นี้ให้ดี!
+            const userIdentifier = auth.currentUser ? (auth.currentUser.email || auth.currentUser.uid) : 'anonymous';
+
+            // Send log data (using no-cors mode, response might be opaque)
+            fetch(WEB_APP_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', },
+                body: JSON.stringify({ input: input, output: output, mode: mode, keyword: keyword, user: userIdentifier }),
+                mode: 'no-cors' // Important for cross-origin requests to Apps Script without complex setup
+            })
+            .then(response => {
+                console.log('Log request sent (status might be opaque due to no-cors).');
+            })
+            .catch(error => {
+                console.error('Logging failed:', error);
+                showToast('⚠️ เกิดปัญหาในการส่ง Log', 3000, true);
+            });
+        }
+
+        // ======== Event Listeners for App Elements ========
+
+        // Mode Buttons
+        [xorModeBtn, wordSpinnerModeBtn, emojiModeBtn].forEach(btn => {
+            if(!btn) return;
+            btn.addEventListener('click', () => {
+                if (!auth.currentUser) {
+                    showToast("⚠️ กรุณาล็อกอินก่อนเปลี่ยนโหมด", 3000, true);
+                    return;
+                }
+                const newMode = btn.id.replace('ModeBtn', '').toLowerCase();
+                if (currentMode !== newMode) {
+                    currentMode = newMode;
+                    updateUI(); // Show/hide keyword input
+                    processCurrentMode(); // Process immediately on mode change
+
+                    // Update active button style
+                    document.querySelectorAll('.mode-btn.active').forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+
+                    let modeName = '';
+                    if (currentMode === 'xor') modeName = 'Key Translator';
+                    else if (currentMode === 'wordspinner') modeName = 'Word Spinner';
+                    else if (currentMode === 'emoji') modeName = 'Emoji Code';
+                    showToast(`✅ เปลี่ยนเป็นโหมด ${modeName}`);
+                }
+            });
+        });
+
+        // Input Text Area (Real-time processing)
+        if(inputText) {
+            inputText.addEventListener('input', processCurrentMode);
+        }
+
+        // Keyword Input (Real-time processing for XOR mode)
+        if(keywordInput) {
+            keywordInput.addEventListener('input', () => {
+                if (currentMode === 'xor' && auth.currentUser) {
+                    processCurrentMode();
+                }
+            });
+        }
+
+        // Copy Button
+        if(copyButton) {
+            copyButton.addEventListener('click', () => {
+                if (!auth.currentUser) {
+                    showToast("⚠️ กรุณาล็อกอินก่อนคัดลอก", 3000, true);
+                    return;
+                }
+                if (!outputText || !outputText.value) {
+                    showToast('❓ ไม่มีข้อความให้คัดลอก', 2000);
+                    return;
+                }
+
+                const inputToLog = inputText.value.trim();
+                const outputToLog = outputText.value;
+                const modeToLog = currentMode;
+                const keywordToLog = (currentMode === 'xor' && keywordInput) ? keywordInput.value.trim() : null; // Log keyword only for XOR
+
+                navigator.clipboard.writeText(outputToLog).then(() => {
+                    showToast('📋 คัดลอกไปยังคลิปบอร์ดแล้ว');
+                    sendLog(inputToLog, outputToLog, modeToLog, keywordToLog); // Send log after successful copy
+                }).catch(err => {
+                    console.error('Clipboard API ล้มเหลว: ', err);
+                    // Fallback for older browsers (less reliable)
+                    try {
+                        if(outputText) {
+                            outputText.select();
+                            outputText.setSelectionRange(0, 99999); // For mobile devices
+                        }
+                        if (document.execCommand('copy')) {
+                            showToast('📋 คัดลอกไปยังคลิปบอร์ดแล้ว (วิธีเก่า)');
+                            sendLog(inputToLog, outputToLog, modeToLog, keywordToLog);
+                        } else {
+                            showToast('❌ ไม่สามารถคัดลอกได้ ลองกด Ctrl+C หรือเลือกข้อความเอง');
+                        }
+                    } catch (execErr) {
+                        console.error('การคัดลอกวิธีเก่าล้มเหลว', execErr);
+                        showToast('❌ ไม่สามารถคัดลอกได้ ลองกด Ctrl+C หรือเลือกข้อความเอง');
+                    }
+                    // Deselect text after attempting copy
+                    if (window.getSelection) { window.getSelection().removeAllRanges(); }
+                    else if (document.selection) { document.selection.empty(); }
+                });
+            });
+        }
+
+        // Clear Button
+        if(clearButton) {
+            clearButton.addEventListener('click', () => {
+                if (!auth.currentUser) {
+                    showToast("⚠️ กรุณาล็อกอินก่อนล้างข้อความ", 3000, true);
+                    return;
+                }
+                if(inputText) inputText.value = '';
+                if(outputText) outputText.value = '';
+                showToast('🧹 ล้างข้อความแล้ว');
+                if(inputText) inputText.focus(); // Focus input after clearing
+            });
+        }
+
+        // Help Modal Logic
+        function showHelp() {
+            if(!helpContent || !helpModal) return;
+            // Populate help content dynamically
+            helpContent.innerHTML = `
+                <div class="pb-4 mb-4 border-b border-gray-600">
+                    <h3 class="text-base font-semibold mb-2 flex items-center gap-2"><i class="fas fa-key text-blue-400"></i> Key Translator Mode</h3>
+                    <p class="text-gray-300">ใส่ข้อความและ Keyword (หากเว้นว่างจะใช้ค่าเริ่มต้น <code>${DEFAULT_KEYWORD}</code>) ระบบจะเข้ารหัส หากข้อความที่ป้อนดูเหมือนถูกเข้ารหัสแล้ว ระบบจะพยายามถอดรหัสด้วย Keyword เดียวกัน</p>
+                </div>
+                <div class="pb-4 mb-4 border-b border-gray-600">
+                    <h3 class="text-base font-semibold mb-2 flex items-center gap-2"><i class="fas fa-smile text-yellow-400"></i> Emoji Code Mode</h3>
+                    <p class="text-gray-300">แปลงตัวอักษร (ไทย, อังกฤษ, ตัวเลข, สัญลักษณ์บางตัว) เป็น Emoji หรือแปลง Emoji กลับเป็นข้อความเดิม ระบบจะคาดเดาโดยอัตโนมัติว่าควรเข้ารหัสหรือถอดรหัส</p>
+                </div>
+                <div class="pb-4 mb-4 border-b border-gray-600">
+                    <h3 class="text-base font-semibold mb-2 flex items-center gap-2"><i class="fas fa-sync-alt text-green-400"></i> Word Spinner Mode</h3>
+                    <p class="text-gray-300">สลับตำแหน่งตัวอักษรทั้งหมดในข้อความแบบสุ่ม พร้อมเพิ่ม Prefix <code>${DEFAULT_PREFIX}</code> และรหัส Seed 4 ตัวที่ด้านหน้า หากข้อความที่ป้อนขึ้นต้นด้วย Prefix และ Seed ระบบจะถอดรหัสกลับเป็นข้อความเดิม</p>
+                </div>
+                <p class="text-xs text-gray-400 italic text-center mt-4">คุณต้องล็อกอินก่อนจึงจะสามารถใช้งานโหมดเหล่านี้ได้ 😉</p>
+            `;
+            helpModal.style.display = 'block';
+        }
+
+        if(helpBtn) helpBtn.addEventListener('click', showHelp);
+        if(closeBtn) closeBtn.addEventListener('click', () => { if(helpModal) helpModal.style.display = 'none'; });
+        // Close modal if clicking outside the content
+        window.addEventListener('click', (event) => {
+            if (event.target === helpModal) {
+                if(helpModal) helpModal.style.display = 'none';
+            }
+        });
+
+        // Initial UI setup (e.g., hide keyword section)
+        if (typeof updateUI === 'function') updateUI();
+
+        console.log("สคริปต์ Spinner โหลดและพร้อมใช้งาน (รอการล็อกอิน)");
+
+        // --- Service Worker Registration (Optional but recommended for PWA) ---
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                // Assuming sw.js is in the same directory
+                navigator.serviceWorker.register('./sw.js')
+                    .then((registration) => {
+                        console.log('Service Worker registered successfully with scope:', registration.scope);
+                    })
+                    .catch((error) => {
+                        console.error('Service Worker registration failed:', error);
+                    });
+            });
+        } else {
+            console.log('Service Worker is not supported by this browser.');
+        }
+
+    </script>
+
+</body>
+</html>
